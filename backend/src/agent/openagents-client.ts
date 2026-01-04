@@ -47,13 +47,16 @@ export class OpenAgentsClient {
 
     async checkHealth(): Promise<boolean> {
         try {
+            console.log(`[OpenAgents] Checking health at ${this.baseUrl}/mcp`);
             // Try to list templates as a health check
-            await this.mcpCall("tools/call", {
+            const result = await this.mcpCall("tools/call", {
                 name: "list_project_templates",
                 arguments: {},
             });
+            console.log(`[OpenAgents] Health check successful:`, result);
             return true;
-        } catch {
+        } catch (error) {
+            console.error(`[OpenAgents] Health check failed:`, error);
             return false;
         }
     }
