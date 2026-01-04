@@ -25,7 +25,8 @@ export class OpenAgentsClient {
     }
 
     private async mcpCall<T>(method: string, params: Record<string, unknown> = {}): Promise<T> {
-        const res = await fetch(`${this.baseUrl}/mcp`, {
+        const url = `${this.baseUrl.replace(/\/$/, '')}/mcp`;
+        const res = await fetch(url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -36,7 +37,16 @@ export class OpenAgentsClient {
             }),
         });
 
-        const data: MCPResponse<T> = await res.json();
+        const responseText = await res.text();
+        console.log(`[OpenAgents] Response status: ${res.status}, body: ${responseText.substring(0, 200)}`);
+
+        let data: MCPResponse<T>;
+        try {
+            data = JSON.parse(responseText);
+        } catch (parseError) {
+            console.error(`[OpenAgents] JSON parse error for response: ${responseText}`);
+            throw new Error(`Invalid JSON response: ${parseError}`);
+        }
 
         if (data.error) {
             throw new Error(data.error.message);
