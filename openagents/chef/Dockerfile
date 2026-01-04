@@ -23,4 +23,4 @@ EXPOSE 8700 8600
 RUN which openagents && openagents --version
 
 # Start the network and agents
-CMD ["sh", "-c", "openagents network start --config network.yaml & sleep 15 && openagents agent start --config agents/router.yaml & sleep 5 && openagents agent start --config agents/web-searcher.yaml & sleep 5 && openagents agent start --config agents/budget-chef.yaml & sleep 5 && openagents agent start --config agents/luxury-chef.yaml & wait"]
+CMD ["sh", "-c", "openagents network start network.yaml & sleep 15 && openagents agent start agents/router.yaml & sleep 5 && openagents agent start agents/web-searcher.yaml & sleep 5 && openagents agent start agents/budget-chef.yaml & sleep 5 && openagents agent start agents/luxury-chef.yaml & wait"]
