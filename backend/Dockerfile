@@ -14,8 +14,8 @@ COPY . .
 # Build the application
 RUN npm run build
 
-# Expose port
-EXPOSE 3001
+# Expose port (Zeabur uses PORT env var)
+EXPOSE $PORT
 
 # Start the application
 CMD ["npm", "start"]
