@@ -1,0 +1,129 @@
+network:
+  name: ChefAssistant
+  mode: centralized
+  node_id: chef-team-1
+  initialized: true
+  transports:
+  - type: http
+    config:
+      port: 8700
+      serve_studio: true
+      serve_mcp: true
+  - type: grpc
+    config:
+      port: 8600
+      max_message_size: 104857600
+      compression: gzip
+      keepalive_time: 60000
+      keepalive_timeout: 30000
+  manifest_transport: http
+  recommended_transport: grpc
+  encryption_enabled: false
+  discovery_interval: 10
+  discovery_enabled: true
+  max_connections: 10
+  connection_timeout: 30.0
+  retry_attempts: 3
+  heartbeat_interval: 60
+  agent_timeout: 180
+  message_queue_size: 1000
+  message_timeout: 30.0
+  message_routing_enabled: true
+  default_agent_group: guest
+  requires_password: false
+  agent_groups:
+    admin:
+      description: Administrator with full permissions
+      password_hash: 8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918
+      metadata:
+        permissions:
+        - all
+    coordinators:
+      description: Router agents that coordinate recipe tasks
+      password_hash: bf24385098410391a81d92b2de72d3a2946d24f42ee387e51004a868281a2408
+      metadata:
+        permissions:
+        - create_projects
+        - delegate_tasks
+      agents:
+      - router
+    chefs:
+      description: Chef agents that create recipes
+      password_hash: 3588bb7219b1faa3d01f132a0c60a394258ccc3049d8e4a243b737e62524d147
+      metadata:
+        permissions:
+        - execute_tasks
+        - report_results
+      agents:
+      - web-searcher
+      - budget-chef
+      - luxury-chef
+  mods:
+  - name: openagents.mods.workspace.default
+    enabled: true
+    config:
+      custom_events_enabled: true
+  - name: openagents.mods.workspace.project
+    enabled: true
+    config:
+      max_concurrent_projects: 5
+      project_templates:
+        budget_recipe:
+          name: Budget Recipe
+          description: Create a budget-friendly recipe with price estimates
+          agent_groups:
+          - coordinators
+          - chefs
+          context: 'Budget Recipe Workflow
+
+            1. Router receives dish request
+
+            2. Web-searcher finds ingredient prices for the location
+
+            3. Budget-chef creates affordable recipe with prices
+
+            4. Router delivers formatted recipe
+
+            '
+        luxury_recipe:
+          name: Luxury Recipe
+          description: Create a premium restaurant-quality recipe
+          agent_groups:
+          - coordinators
+          - chefs
+          context: 'Luxury Recipe Workflow
+
+            1. Router receives dish request
+
+            2. Web-searcher finds premium ingredient prices
+
+            3. Luxury-chef creates upscale recipe with wine pairing
+
+            4. Router delivers formatted recipe
+
+            '
+  created_by_version: 0.8.5
+network_profile:
+  discoverable: true
+  name: Chef Recipe Assistant
+  description: Get budget-friendly and luxury recipes with real ingredient prices
+  tags:
+  - chef
+  - recipe
+  - cooking
+  - budget
+  - luxury
+  categories:
+  - demo
+  - workflow
+  country: Worldwide
+  required_openagents_version: 0.6.13
+  capacity: 10
+  authentication:
+    type: none
+  host: 0.0.0.0
+  port: 8700
+log_level: INFO
+data_dir: ./data/chef-team
+runtime_limit: null
+shutdown_timeout: 30

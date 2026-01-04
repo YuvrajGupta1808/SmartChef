@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chef Recipe Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        yellow: {
+                            50: '#fefce8', 100: '#fef9c3', 200: '#fef08a', 300: '#fde047',
+                            400: '#facc15', 500: '#eab308', 600: '#ca8a04', 700: '#a16207',
+                            800: '#854d0e', 900: '#713f12',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .prose table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+        .prose th, .prose td { border: 1px solid #fde047; padding: 0.5rem; text-align: left; }
+        .prose th { background: #fef9c3; }
+        .prose h2 { font-size: 1.25rem; font-weight: bold; margin-top: 1rem; }
+        .prose h3 { font-size: 1.1rem; font-weight: 600; margin-top: 0.75rem; }
+        .prose ul, .prose ol { margin-left: 1.5rem; }
+        .prose li { margin: 0.25rem 0; }
+        .prose p { margin: 0.5rem 0; }
+        .prose strong { font-weight: 600; }
+        .prose hr { border-color: #fde047; margin: 1rem 0; }
+    </style>
+</head>
+<body class="bg-yellow-50 h-screen flex flex-col">
+    <header class="bg-yellow-400 shadow-md flex-shrink-0">
+        <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl">👨‍🍳</span>
+                <h1 class="text-lg font-bold text-yellow-900">Chef Recipe Assistant</h1>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="hidden sm:flex gap-2 text-xs">
+                    <span class="bg-yellow-300 px-2 py-1 rounded">💰 Budget</span>
+                    <span class="bg-yellow-300 px-2 py-1 rounded">✨ Luxury</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="status-dot" class="w-2 h-2 bg-gray-400 rounded-full"></span>
+                    <span id="status-text" class="text-sm text-yellow-800">Connecting...</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 flex flex-col max-w-6xl w-full mx-auto overflow-hidden">
+        <div class="flex-1 overflow-y-auto p-4 space-y-4" id="chat-messages">
+            <div class="flex gap-3">
+                <div class="w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center text-sm flex-shrink-0">🤖</div>
+                <div class="bg-yellow-100 rounded-lg p-3 max-w-3xl">
+                    <p class="text-sm text-yellow-900">Welcome! I'm your Chef Assistant. Ask me for budget-friendly or luxury recipes!</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="border-t-2 border-yellow-200 p-4 bg-yellow-50 flex-shrink-0">
+            <form id="chat-form" class="flex gap-3">
+                <input type="text" id="message-input" placeholder="Ask for a recipe..." 
+                    class="flex-1 px-4 py-3 rounded-lg border-2 border-yellow-300 focus:border-yellow-500 focus:outline-none bg-white text-base">
+                <button type="submit" id="send-btn"
+                    class="px-6 py-3 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-semibold rounded-lg transition-colors disabled:opacity-50">
+                    Send
+                </button>
+            </form>
+        </div>
+    </main>
+
+    <script>
+        const API_BASE = 'http://localhost:8700';
+        const CHANNEL = 'general';
+        const POLL_INTERVAL = 1000;
+        const AGENT_ID = 'chef-web-ui';
+        
+        const form = document.getElementById('chat-form');
+        const input = document.getElementById('message-input');
+        const messages = document.getElementById('chat-messages');
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+        const sendBtn = document.getElementById('send-btn');
+
+        let clientSecret = null;
+        let displayedMessageIds = new Set();
+        let isConnected = false;
+
+        function setStatus(connected) {
+            isConnected = connected;
+            statusDot.className = `w-2 h-2 rounded-full ${connected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`;
+            statusText.textContent = connected ? 'Connected' : 'Disconnected';
+            sendBtn.disabled = !connected;
+        }
+
+        function generateEventId() {
+            return `${AGENT_ID}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        }
+
+        function addMessage(text, isUser = false) {
+            const div = document.createElement('div');
+            div.className = `flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`;
+            const icon = isUser ? '👤' : '👨‍🍳';
+            const bgColor = isUser ? 'bg-yellow-600' : 'bg-yellow-400';
+            const msgBg = isUser ? 'bg-yellow-200' : 'bg-yellow-100';
+            const renderedText = isUser ? escapeHtml(text) : marked.parse(text);
+            
+            div.innerHTML = `
+                <div class="w-8 h-8 ${bgColor} rounded-full flex items-center justify-center text-sm flex-shrink-0">${icon}</div>
+                <div class="${msgBg} rounded-lg p-3 max-w-3xl prose prose-sm">
+                    ${isUser ? `<p class="text-sm text-yellow-900">${renderedText}</p>` : `<div class="text-sm text-yellow-900">${renderedText}</div>`}
+                </div>
+            `;
+            messages.appendChild(div);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        function addTypingIndicator() {
+            removeTypingIndicator();
+            const div = document.createElement('div');
+            div.id = 'typing-indicator';
+            div.className = 'flex gap-3';
+            div.innerHTML = `
+                <div class="w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center text-sm flex-shrink-0">👨‍🍳</div>
+                <div class="bg-yellow-100 rounded-lg p-3">
+                    <div class="flex gap-1">
+                        <span class="w-2 h-2 bg-yellow-600 rounded-full animate-bounce" style="animation-delay: 0ms"></span>
+                        <span class="w-2 h-2 bg-yellow-600 rounded-full animate-bounce" style="animation-delay: 150ms"></span>
+                        <span class="w-2 h-2 bg-yellow-600 rounded-full animate-bounce" style="animation-delay: 300ms"></span>
+                    </div>
+                </div>
+            `;
+            messages.appendChild(div);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        function removeTypingIndicator() {
+            const indicator = document.getElementById('typing-indicator');
+            if (indicator) indicator.remove();
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function register() {
+            try {
+                const response = await fetch(`${API_BASE}/api/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        agent_id: AGENT_ID,
+                        agent_group: 'guest'
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.secret) {
+                        clientSecret = data.secret;
+                        setStatus(true);
+                        await joinChannel();
+                        startPolling();
+                        return true;
+                    }
+                }
+            } catch (e) {
+                console.error('Registration failed:', e);
+            }
+            setStatus(false);
+            setTimeout(register, 5000);
+            return false;
+        }
+
+        async function joinChannel() {
+            await fetch(`${API_BASE}/api/send_event`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    event_id: generateEventId(),
+                    event_name: 'thread.channel.join',
+                    metadata: {},
+                    payload: { channel: CHANNEL },
+                    secret: clientSecret,
+                    source_id: AGENT_ID,
+                    target_agent_id: 'mod:openagents.mods.workspace.messaging',
+                    visibility: 'network'
+                })
+            });
+        }
+
+        async function sendMessage(text) {
+            if (!clientSecret) return false;
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/send_event`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        event_id: generateEventId(),
+                        event_name: 'thread.channel_message.post',
+                        metadata: {},
+                        payload: {
+                            channel: CHANNEL,
+                            content: { text },
+                            message_type: 'channel_message'
+                        },
+                        secret: clientSecret,
+                        source_id: AGENT_ID,
+                        target_agent_id: `channel:${CHANNEL}`,
+                        visibility: 'network'
+                    })
+                });
+                return response.ok;
+            } catch (e) {
+                console.error('Send failed:', e);
+                return false;
+            }
+        }
+
+        async function fetchChannelMessages() {
+            if (!clientSecret) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/poll?agent_id=${AGENT_ID}&secret=${clientSecret}`);
+                
+                if (response.ok) {
+                    setStatus(true);
+                    const data = await response.json();
+                    
+                    if (data.messages && data.messages.length > 0) {
+                        data.messages.forEach(msg => {
+                            const msgId = msg.event_id || msg.message_id || `${msg.timestamp}_${Math.random()}`;
+                            if (displayedMessageIds.has(msgId)) return;
+                            
+                            const payload = msg.payload || msg;
+                            const text = payload.content?.text || payload.text || '';
+                            const senderId = payload.sender_id || payload.source_id || msg.source_id || 'router';
+                            
+                            if (!text) return;
+                            
+                            displayedMessageIds.add(msgId);
+                            removeTypingIndicator();
+                            
+                            const isUser = senderId === AGENT_ID;
+                            addMessage(text, isUser);
+                        });
+                    }
+                } else {
+                    setStatus(false);
+                }
+            } catch (e) {
+                console.error('Poll failed:', e);
+                setStatus(false);
+            }
+        }
+
+        function startPolling() {
+            setInterval(fetchChannelMessages, POLL_INTERVAL);
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const text = input.value.trim();
+            if (!text || !isConnected) return;
+            
+            input.value = '';
+            addMessage(text, true);
+            addTypingIndicator();
+            
+            const success = await sendMessage(text);
+            if (!success) {
+                removeTypingIndicator();
+                addMessage('Failed to send message. Please try again.', false);
+            }
+        });
+
+        register();
+    </script>
+</body>
+</html>

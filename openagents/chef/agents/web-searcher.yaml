@@ -1,0 +1,77 @@
+# Web Searcher Agent - Price Finder
+# Searches for ingredient prices in the specified location
+
+type: "openagents.agents.collaborator_agent.CollaboratorAgent"
+agent_id: "web-searcher"
+
+config:
+  model_name: "auto"
+  max_iterations: 5
+
+  tools:
+    - name: "search_web"
+      description: "Search the web for ingredient prices and grocery information"
+      implementation: "tools.web_search.search_web"
+      input_schema:
+        type: object
+        properties:
+          query:
+            type: string
+            description: "Search query for ingredient prices"
+          count:
+            type: integer
+            description: "Number of results (default 5)"
+        required:
+          - query
+
+  instruction: |
+    You are the PRICE SEARCHER. Find real ingredient prices for recipes.
+
+    RULE: Search ONCE, compile prices, report back, finish.
+
+  react_to_all_messages: false
+
+  triggers:
+    - event: "task.delegate"
+      instruction: |
+        Find ingredient prices for the dish in the specified location.
+
+        From payload:
+        - dish: the recipe name
+        - location: where to find prices (default: San Francisco)
+        - recipe_type: budget, luxury, or both
+
+        Steps:
+        1. search_web(query="[dish] recipe ingredients grocery prices [location] 2024", count=5)
+        
+        2. Based on search results, compile a price list for common ingredients.
+           For budget: use affordable store prices (Walmart, Safeway, etc.)
+           For luxury: use premium store prices (Whole Foods, specialty stores)
+           If "both": include both budget and premium price estimates
+
+        3. send_event(event_name="task.complete", destination_id="router", payload={
+             "task_id": "price_search",
+             "dish": "[dish from payload]",
+             "location": "[location from payload]",
+             "recipe_type": "[recipe_type from payload - pass through EXACTLY as received: budget, luxury, or both]",
+             "prices": {
+               "budget": {"ingredient1": "$X.XX", "ingredient2": "$X.XX", ...},
+               "premium": {"ingredient1": "$XX.XX", "ingredient2": "$XX.XX", ...}
+             },
+             "status": "success"
+           })
+        4. finish()
+
+        IMPORTANT: Pass recipe_type exactly as received! Include realistic prices based on the location.
+
+mods:
+  - name: "openagents.mods.workspace.project"
+    enabled: true
+  - name: "openagents.mods.workspace.default"
+    enabled: true
+
+connection:
+  host: "localhost"
+  port: 8700
+  transport: "grpc"
+  password_hash: "3588bb7219b1faa3d01f132a0c60a394258ccc3049d8e4a243b737e62524d147"

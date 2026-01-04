@@ -1,0 +1,1 @@
+# Chef workspace package

@@ -1,0 +1,85 @@
+# Router Agent - Recipe Coordinator
+# Coordinates between web-searcher and chef agents
+
+type: "openagents.agents.collaborator_agent.CollaboratorAgent"
+agent_id: "router"
+
+config:
+  model_name: "auto"
+  max_iterations: 8
+
+  instruction: |
+    You are the RECIPE ROUTER. You coordinate recipe creation between agents.
+
+    TOOLS:
+    - send_project_message(project_id, content) - content={"text": "message"}
+    - send_event(event_name, destination_id, payload)
+    - complete_project(project_id, summary)
+    - finish()
+
+    IMPORTANT: When you receive a completed recipe from budget-chef or luxury-chef, 
+    you MUST call complete_project to finish. Do NOT delegate again.
+
+  react_to_all_messages: false
+
+  triggers:
+    - event: "project.notification.started"
+      instruction: |
+        Project started. Get dish from payload.goal, location from context (default: San Francisco).
+        
+        Check the template_id in payload:
+        - "budget_recipe" -> route to budget-chef
+        - "luxury_recipe" -> route to luxury-chef
+
+        Do these steps:
+        1. send_project_message(project_id=project_id, content={"text": "Starting recipe for [dish]! Searching for ingredient prices in [location]..."})
+        2. send_event(event_name="task.delegate", destination_id="web-searcher", payload={"task_id": "prices", "dish": "[dish]", "location": "[location]", "recipe_type": "[budget or luxury based on template_id]"})
+        3. finish()
+
+    - event: "task.complete"
+      instruction: |
+        A task completed. Check source_id to determine what to do:
+
+        STEP 1: Identify the source
+        - source_id="web-searcher" means PRICES are ready -> delegate to chef
+        - source_id="budget-chef" means BUDGET RECIPE is ready -> complete project
+        - source_id="luxury-chef" means LUXURY RECIPE is ready -> complete project
+
+        STEP 2: Take action based on source_id
+
+        IF source_id is "web-searcher":
+          Prices received. Check payload.recipe_type to route to correct chef:
+          
+          If payload.recipe_type is "budget":
+            1. send_project_message(project_id=project_id, content={"text": "💰 Creating budget recipe..."})
+            2. send_event(event_name="task.delegate", destination_id="budget-chef", payload={"task_id": "budget", "dish": payload.dish, "location": payload.location, "prices": payload.prices, "recipe_type": "budget"})
+            3. finish()
+
+          If payload.recipe_type is "luxury":
+            1. send_project_message(project_id=project_id, content={"text": "✨ Creating luxury recipe..."})
+            2. send_event(event_name="task.delegate", destination_id="luxury-chef", payload={"task_id": "luxury", "dish": payload.dish, "location": payload.location, "prices": payload.prices, "recipe_type": "luxury"})
+            3. finish()
+
+        IF source_id is "budget-chef" OR source_id is "luxury-chef":
+          RECIPE IS COMPLETE! The full recipe is in payload.recipe.
+          DO NOT delegate again. Complete the project now:
+          1. send_project_message(project_id=project_id, content={"text": payload.recipe})
+          2. complete_project(project_id=project_id, summary="Recipe completed")
+          3. finish()
+
+        CRITICAL RULES:
+        - When source_id is "luxury-chef" or "budget-chef", you MUST complete the project, NOT delegate again
+        - The payload.recipe contains the FULL formatted recipe - post it exactly as received
+        - Never summarize or truncate the recipe
+
+mods:
+  - name: "openagents.mods.workspace.project"
+    enabled: true
+  - name: "openagents.mods.workspace.default"
+    enabled: true
+
+connection:
+  host: "localhost"
+  port: 8700
+  transport: "grpc"
+  password_hash: "bf24385098410391a81d92b2de72d3a2946d24f42ee387e51004a868281a2408"
