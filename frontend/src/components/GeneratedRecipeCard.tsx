@@ -401,6 +401,200 @@ export function GeneratedRecipeCard({ markdown, recipeType, onFavorite, isFavori
     </div>
   );
 
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const servingsMultiplier = servings / recipe.servings;
+
+    const formatQuantity = (quantity: string, multiplier: number) => {
+      const num = parseFloat(quantity);
+      if (isNaN(num)) return quantity;
+      const scaled = num * multiplier;
+      return scaled % 1 === 0 ? scaled.toString() : scaled.toFixed(1);
+    };
+
+    const ingredientsHtml = recipe.ingredients.map(ing => `
+      <li style="margin: 8px 0; padding: 8px; border-bottom: 1px solid #eee;">
+        <strong>${formatQuantity(ing.quantity, servingsMultiplier)} ${ing.unit}</strong> ${ing.name}
+        ${ing.price > 0 ? `<span style="float: right; color: #666;">$${(ing.price * servingsMultiplier).toFixed(2)}</span>` : ''}
+      </li>
+    `).join('');
+
+    const stepsHtml = recipe.steps.map(step => `
+      <div style="margin: 16px 0; page-break-inside: avoid;">
+        <div style="display: flex; gap: 12px;">
+          <div style="flex-shrink: 0; width: 32px; height: 32px; background: linear-gradient(135deg, #f97316, #fb923c); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
+            ${step.number}
+          </div>
+          <div style="flex: 1;">
+            <h4 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">${step.title}</h4>
+            ${step.description ? `<p style="margin: 0; line-height: 1.6; color: #333;">${step.description}</p>` : ''}
+          </div>
+        </div>
+      </div>
+    `).join('');
+
+    const equipmentHtml = recipe.equipment.length > 0 ? `
+      <h3 style="margin: 24px 0 12px 0; font-size: 18px; border-bottom: 2px solid #f97316; padding-bottom: 8px;">Equipment Needed</h3>
+      <ul style="list-style: none; padding: 0;">
+        ${recipe.equipment.map(item => `<li style="display: inline-block; margin: 4px 8px 4px 0; padding: 6px 12px; background: #f3f4f6; border-radius: 6px; font-size: 14px;">👨‍🍳 ${item}</li>`).join('')}
+      </ul>
+    ` : '';
+
+    const tipsHtml = recipe.tips.length > 0 ? `
+      <h3 style="margin: 24px 0 12px 0; font-size: 18px; border-bottom: 2px solid #f97316; padding-bottom: 8px;">Chef's Tips</h3>
+      <ul style="list-style: none; padding: 0;">
+        ${recipe.tips.map(tip => `<li style="margin: 8px 0; padding: 8px; background: #fffbeb; border-left: 3px solid #f97316;">💡 ${tip}</li>`).join('')}
+      </ul>
+    ` : '';
+
+    const finishingHtml = recipe.finishingGarnish.length > 0 ? `
+      <h3 style="margin: 24px 0 12px 0; font-size: 18px; border-bottom: 2px solid #f97316; padding-bottom: 8px;">Finishing & Garnish</h3>
+      <ul style="list-style: none; padding: 0;">
+        ${recipe.finishingGarnish.map(item => `<li style="margin: 8px 0;">🌿 ${item}</li>`).join('')}
+      </ul>
+    ` : '';
+
+    printWindow.document.write(`
+<!DOCTYPE html>
+<html>
+<head>
+  <title>${recipe.name} - Recipe</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Georgia', serif;
+      line-height: 1.6;
+      color: #1f2937;
+      background: white;
+      padding: 40px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 32px;
+      margin-bottom: 8px;
+      color: #1f2937;
+      font-weight: 700;
+    }
+    .tag {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-right: 8px;
+      text-transform: uppercase;
+    }
+    .tag-budget { background: #dcfce7; color: #166534; }
+    .tag-luxury { background: #fef3c7; color: #92400e; }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      margin: 20px 0;
+      padding: 16px;
+      background: #f9fafb;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .meta-label { color: #6b7280; font-size: 12px; }
+    .meta-value { font-weight: 600; font-size: 16px; }
+    h3 {
+      font-size: 18px;
+      margin: 24px 0 12px 0;
+      border-bottom: 2px solid #f97316;
+      padding-bottom: 8px;
+    }
+    ul { list-style: none; padding: 0; }
+    li { margin: 8px 0; }
+    .wine-pairing {
+      background: #fef3c7;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin: 16px 0;
+      font-style: italic;
+    }
+    .image {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      margin: 16px 0;
+    }
+    @media print {
+      body { padding: 20px; }
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <span class="tag ${recipe.type === 'budget' ? 'tag-budget' : 'tag-luxury'}">
+    ${recipe.type === 'budget' ? '💰 Budget Recipe' : '✨ Luxury Recipe'}
+  </span>
+  <h1>${recipe.name}</h1>
+
+  ${recipe.winePairing ? `<p class="wine-pairing">🍷 <strong>Wine Pairing:</strong> ${recipe.winePairing}</p>` : ''}
+
+  <div class="meta">
+    <div class="meta-item">
+      <span class="meta-label">⏱️ Prep</span>
+      <span class="meta-value">${recipe.prepTime} min</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">🍳 Cook</span>
+      <span class="meta-value">${recipe.cookTime} min</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">⏰ Total</span>
+      <span class="meta-value">${recipe.totalTime} min</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">👥 Servings</span>
+      <span class="meta-value">${servings}</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">💰 Cost</span>
+      <span class="meta-value" style="color: ${recipe.type === 'budget' ? '#166534' : '#92400e'};">
+        $${(recipe.totalCost * servingsMultiplier).toFixed(2)}
+      </span>
+    </div>
+  </div>
+
+  ${finalDishImage ? `<img src="${finalDishImage}" alt="${recipe.name}" class="image">` : ''}
+
+  <h3>Ingredients (${recipe.ingredients.length})</h3>
+  <ul>${ingredientsHtml}</ul>
+
+  ${equipmentHtml}
+
+  <h3>Instructions (${recipe.steps.length} steps)</h3>
+  ${stepsHtml}
+
+  ${finishingHtml}
+  ${tipsHtml}
+
+  <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #9ca3af; font-size: 12px;">
+    Generated by Smart Chef • ${new Date().toLocaleDateString()}
+  </div>
+
+  <div class="no-print" style="position: fixed; top: 20px; right: 20px;">
+    <button onclick="window.print()" style="padding: 12px 24px; background: #f97316; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 600; box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);">
+      🖨️ Print Recipe
+    </button>
+  </div>
+</body>
+</html>
+    `);
+
+    printWindow.document.close();
+  };
+
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card rounded-2xl overflow-hidden shadow-lg">
@@ -431,7 +625,7 @@ export function GeneratedRecipeCard({ markdown, recipeType, onFavorite, isFavori
                   <Heart className={`w-5 h-5 ${isFavorite ? 'fill-destructive text-destructive' : ''}`} />
                 </Button>
                 <Button variant="glass" size="icon" className="rounded-full backdrop-blur-sm"><Share2 className="w-5 h-5" /></Button>
-                <Button variant="glass" size="icon" className="rounded-full backdrop-blur-sm"><Printer className="w-5 h-5" /></Button>
+                <Button variant="glass" size="icon" onClick={handlePrint} className="rounded-full backdrop-blur-sm"><Printer className="w-5 h-5" /></Button>
               </div>
             </div>
           </div>
@@ -456,7 +650,7 @@ export function GeneratedRecipeCard({ markdown, recipeType, onFavorite, isFavori
                 <Heart className={`w-5 h-5 ${isFavorite ? 'fill-destructive text-destructive' : ''}`} />
               </Button>
               <Button variant="glass" size="icon" className="rounded-full"><Share2 className="w-5 h-5" /></Button>
-              <Button variant="glass" size="icon" className="rounded-full"><Printer className="w-5 h-5" /></Button>
+              <Button variant="glass" size="icon" onClick={handlePrint} className="rounded-full"><Printer className="w-5 h-5" /></Button>
             </div>
           </div>
         </div>

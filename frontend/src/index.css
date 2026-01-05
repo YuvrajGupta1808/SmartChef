@@ -276,3 +276,105 @@
     50% { transform: translateY(-5px); }
   }
 }
+
+/* Print styles for recipe cards */
+@media print {
+  /* Hide specific non-essential elements */
+  nav,
+  footer,
+  header,
+  button,
+  .print-hide {
+    display: none !important;
+  }
+
+  /* Reset body for print */
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Ensure recipe card is visible */
+  #root,
+  main,
+  .glass-card {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .glass-card {
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+    background: white !important;
+    backdrop-filter: none !important;
+  }
+
+  /* Ensure all sections are expanded */
+  .overflow-hidden {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+
+  /* Hide collapsible buttons */
+  .chevron,
+  .fa-chevron-down,
+  .fa-chevron-up {
+    display: none !important;
+  }
+
+  /* Hide checkboxes for ingredients */
+  input[type="checkbox"],
+  .w-5.h-5.rounded-full {
+    display: none !important;
+  }
+
+  /* Ensure text is readable */
+  * {
+    color: black !important;
+    text-shadow: none !important;
+  }
+
+  /* Ensure images print properly */
+  img {
+    max-width: 100% !important;
+    height: auto !important;
+    page-break-inside: avoid;
+  }
+
+  /* Avoid page breaks within sections */
+  .border-b,
+  section,
+  [class*="Section"] {
+    page-break-inside: avoid;
+  }
+
+  /* Print links properly */
+  a {
+    text-decoration: underline;
+    color: black !important;
+  }
+
+  /* Remove backgrounds that waste ink */
+  .bg-secondary\/50,
+  .bg-muted\/30,
+  .bg-budget-light\/90,
+  .bg-luxury-light\/90,
+  .gradient-warm,
+  .gradient-budget,
+  .gradient-luxury {
+    background: white !important;
+  }
+
+  /* Ensure text colors print */
+  .text-budget,
+  .text-luxury,
+  .text-primary,
+  .text-muted-foreground {
+    color: black !important;
+  }
+}
